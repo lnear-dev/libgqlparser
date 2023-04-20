@@ -1,0 +1,296 @@
+# Mini-language for AST definition
+# All AST nodes extend AstNode.
+# All AST nodes are visitable.
+# All AST fields have a getter and a setter and are a constructor argument.
+# We have concrete types (code T) and unions (code U).
+# S for singular field, P for plural, ? for nullable.
+# Scalar type ontology: string, int, float, bool, null
+
+U Node
+O Stmt
+O Expr
+
+T Program
+P Stmt[] statements
+
+T Stmt
+O Nop
+O Label
+O Goto
+O Echo
+O Assign
+O Return
+O Break
+O Continue
+O If
+O Switch
+O Case
+O Default
+O While
+O DoWhile
+O For
+O Foreach
+O Declare
+O TryCatch
+O Throw
+O Unset
+O DeclareDeclare
+
+T Nop
+
+T Label
+S string name
+
+T Goto
+S string label
+
+T Echo
+P Expr[] expressions
+
+T Assign
+S Expr var
+S Expr value
+
+T Return
+S? Expr expr
+
+T Break
+S? Expr num
+
+T Continue
+S? Expr num
+
+T If
+S Expr cond
+S Stmt stmt
+S? Stmt else
+
+T Switch
+S Expr cond
+P Case[] cases
+
+T Case
+S Expr cond
+P Stmt[] stmts
+
+T Default
+P Stmt[] stmts
+
+T While
+S Expr cond
+S Stmt stmt
+
+T DoWhile
+S Stmt stmt
+S Expr cond
+
+T For
+P Stmt[] init
+S? Expr cond
+P Expr[] loop
+S Stmt stmt
+
+T Foreach
+S Expr array
+S Expr var
+S? Expr keyVar
+S Stmt stmt
+
+T Declare
+S Stmt stmt
+P DeclareDeclare[] declares
+
+T DeclareDeclare
+S string key
+S Expr value
+
+T TryCatch
+S Stmt tryStmt
+P Catch[] catches
+
+T Catch
+S? Name type
+S string var
+S Stmt stmt
+
+T Throw
+S Expr expr
+
+T Unset
+P Expr[] vars
+
+T Expr
+O ConstFetch
+O Array
+O FuncCall
+O MethodCall
+O PropertyFetch
+O StaticCall
+O ClassConstFetch
+O New
+O Ternary
+O Isset
+O Empty
+O Eval
+O Print
+O Exit
+O Clone
+O Yield
+O YieldFrom
+O ShellExec
+O Instanceof
+O UnaryPlus
+O UnaryMinus
+O BitwiseNot
+O BooleanNot
+O ErrorSuppress
+O Variable
+O ArrayDimFetch
+O ListExpr
+O Cast
+O Closure
+
+T ConstFetch
+S Name name
+
+T Array
+P ArrayItem[] items
+S bool isShortSyntax
+
+T ArrayItem
+S? Expr key
+S Expr value
+
+T FuncCall
+S Name name
+P? Arg[] args
+
+T MethodCall
+S Expr var
+S Name name
+P? Arg[] args
+
+T PropertyFetch
+S Expr var
+S Name name
+
+T StaticCall
+S Classname class
+S Name name
+P? Arg[] args
+
+T ClassConstFetch
+S Classname class
+S Name name
+
+T New
+S Classname class
+P? Arg[] args
+
+T Ternary
+S Expr condition
+S Expr ifTrue
+S Expr ifFalse
+
+T Isset
+P Expr[] vars
+
+T Empty
+S Expr var
+
+T Eval
+S Expr expr
+
+T Print
+S Expr expr
+
+T Exit
+S? Expr expr
+
+T Clone
+S Expr expr
+
+T Yield
+S? Expr key
+S Expr value
+
+T YieldFrom
+S Expr expr
+
+T ShellExec
+S string expr
+
+T Instance
+S Expr expr
+S Classname class
+
+T UnaryPlus
+S Expr expr
+
+T UnaryMinus
+S Expr expr
+
+T BitwiseNot
+S Expr expr
+
+T BooleanNot
+S Expr expr
+
+T ErrorSuppress
+S Expr expr
+
+T Variable
+S string name
+
+T ArrayDimFetch
+S Expr var
+S Expr dim
+
+T ListExpr
+P ListItem[] items  
+
+T ListItem
+S? Expr key
+S Expr value
+
+T Cast
+S Expr expr
+S CastType type
+
+T Closure
+P? Arg[] args
+P? Stmt[] stmts
+S? Classname returnType
+
+T Arg
+S? Name type
+S? string name
+S Expr value
+
+T CastType
+O IntCast
+O DoubleCast
+O StringCast
+O ArrayCast
+O ObjectCast
+O BoolCast
+O UnsetCast
+
+T IntCast
+
+T DoubleCast
+
+T StringCast
+
+T ArrayCast
+
+T ObjectCast
+
+T BoolCast
+
+T UnsetCast
+
+T Name
+
+T Classname
+

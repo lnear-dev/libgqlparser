@@ -24,7 +24,7 @@ EOT;
         echo <<<'EOT'
 
 #ifdef __cplusplus
-extern "C" {
+}
 #endif
 
 EOT;
@@ -33,12 +33,12 @@ EOT;
     public function startType(string $name): void
     {
         $stName = structName($name);
-        echo 'struct ' . $stName . ';';
+        echo 'struct ' . $stName . ';' . PHP_EOL;
         $this->currentType = $name;
     }
     public function field(string $type, string $name, bool $nullable, bool $plural): void
     {
-        echo fieldPrototype($this->currentType, $type, $name, $nullable, $plural) . ';';
+        echo fieldPrototype($this->currentType, $type, $name, $nullable, $plural) . ';' . PHP_EOL;
     }
     public function endType(string $name): void
     {
@@ -46,7 +46,7 @@ EOT;
     }
     public function startUnion(string $name): void
     {
-        echo 'struct ' . structName($name) . ';';
+        echo 'struct ' . structName($name) . ';' . PHP_EOL;
     }
     public function unionOption(string $optionType): void
     {

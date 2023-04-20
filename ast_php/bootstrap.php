@@ -15,36 +15,52 @@ function returnType($type)
     return 'const struct ' . structName($type) . ' *';
 }
 
-
-function title($name)
+function snake($str)
 {
-    return ucfirst($name);
+    if (strlen($str) < 2) {
+        return strtolower($str);
+    }
+    $out = strtolower($str[0]);
+    for ($i = 1; $i < strlen($str); $i++) {
+        $c = $str[$i];
+        if (ctype_upper($c)) {
+            $out .= '_';
+            $c = strtolower($c);
+        }
+        $out .= $c;
+    }
+    return $out;
 }
 function fieldPrototype($owningType, $type, $name, $nullable, $plural)
 {
     $stName = structName($owningType);
     if ($plural) {
-        return 'int ' . $stName . '_get_' . snake($name) . '_size(const struct ' . $stName . ' *node)';
+        return sprintf('int %s_get_%s_size(const struct %s *node)', $stName, snake($name), $stName);
     } else {
         $retType = returnType($type);
-        return $retType . ' ' . $stName . '_get_' . snake($name) . '(const struct ' . $stName . ' *node)';
+        return sprintf('%s %s_get_%s(const struct %s *node)', $retType, $stName, snake($name), $stName);
     }
 }
-function snake($str)
-{
-    $str = preg_replace('/\s+/u', '', ucwords($str));
-    $str = lcfirst($str);
-    return $str;
-}
 
+define("LICENSE", <<<EOT
+/**
+ * **This whole file is generated. Do not edit.**
+ * Copyright 2023-present Lnear
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+EOT
+);
+
+
+function title($name)
+{
+    return ucfirst($name);
+}
 
 function camel($str)
 {
-    $str = preg_replace('/[^a-zA-Z0-9]/', ' ', $str);
-    $str = ucwords($str);
-    $str = str_replace(' ', '', $str);
-    $str = lcfirst($str);
-    return $str;
+    return lcfirst($str);
 }
 interface LanguagePrinter {
     public function startFile(): void;

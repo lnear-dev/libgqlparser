@@ -1,22 +1,20 @@
 <?php
-require __DIR__ . '/bootstrap.php';
-
+require_once __DIR__ . '/bootstrap.php';
+    
 class Printer implements LanguagePrinter
 {
     private $type_name;
     private $fields = [];
     private $bases = [];
     private $deferredOutput = '';
-    private $output = '';
 
     public function baseClass($type)
     {
         return isset($this->bases[$type]) ? $this->bases[$type] : 'Node';
     }
 
-    public function startFile()
+    public function startFile(): void
     {
-        $this->output = '';
         $this->deferredOutput = '';
             echo <<<'EOF'
             /** @generated */
@@ -42,10 +40,10 @@ class Printer implements LanguagePrinter
         EOF;
     }
 
-    public function endFile()
+    public function endFile(): void
     {
+        echo '';
         echo $this->deferredOutput;
-        echo $this->output;
         echo <<<'EOF'
         } // namespace ast
         } // namespace graphql
@@ -54,120 +52,189 @@ class Printer implements LanguagePrinter
         EOF;
     }
 
-    public function startType($name, $isUnion)
+
+    public function printFields()
     {
-        $this->type_name = $name;
-        $this->fields = [];
-        $this->deferredOutput .= "class $name;\n";
-        $this->output .= "class $name : public {$this->baseClass($name)} {\n";
-        $this->output .= " public:\n";
-        if ($isUnion) {
-            $this->output .= "  enum Kind {\n";
-            foreach ($this->bases as $type => $base) {
-                if ($base === $name) {
-                    $this->output .= "    k$base,\n";
-                }
+        foreach ($this->fields as $field) {
+            list($type, $name, $nullable, $plural) = $field;
+            $storage_type = $this->storageType($type);
+            if ($plural) {
+                $storage_type = "std::unique_ptr<std::vector<$storage_type>>";
             }
-            $this->output .= "  };\n";
-            $this->output .= "  Kind getKind() const { return kind_; }\n";
+            $this->deferredOutput .= "  $storage_type {$name}_;
+
+";
         }
     }
 
-    public function field($type, $name, $nullable, $plural)
+    public function storageType($type)
     {
+        if ($type == 'string') {
+            return 'std::unique_ptr<const char, CDeleter>';
+        } elseif ($type == 'boolean') {
+            return 'bool';
+        } else {
+            return "std::unique_ptr<$type>";
+        }
+    }
+
+    public function ctorSingularType($type)
+    {
+        if ($type == 'string') {
+            return 'const char *';
+        } elseif ($type == 'boolean') {
+            return 'bool';
+        } else {
+            return "$type *";
+        }
+    }
+
+    public function ctorPluralType($type)
+    {
+        return "std::vector<{$this->storageType($type)}> *";
+    }
+    public function printConstructor()
+    {
+        $this->deferredOutput .= "  explicit {$this->type_name}(\n";
+        $this->deferredOutput .= "    const yy::location &location\n";
+        $cTorArg = function ($type, $name, $plural) {
+            if ($plural) {
+                $ctor_type = $this->ctorPluralType($type);
+            } else {
+                $ctor_type = $this->ctorSingularType($type);
+            }
+            return "      $ctor_type $name";
+        };
+        $cTorInit = function ($type, $name, $plural) {
+            // Strings are const char *, just pass.
+            // Vectors are passed by pointer and we take ownership.
+            // Node types are passed in by pointer and we take ownership.
+            $value = $name;
+            return "    {$name}_($value)";
+        };
+        $args = array_map($cTorArg, array_column($this->fields, 0), array_column($this->fields, 1), array_column($this->fields, 3));
+        $inits = array_map($cTorInit, array_column($this->fields, 0), array_column($this->fields, 1), array_column($this->fields, 3));
+        $this->deferredOutput .= join(",\n", $args);
+        $this->deferredOutput .= "\n  ) : {$this->baseClass($this->type_name)}(location)\n";
+        $this->deferredOutput .= join(",\n", $inits);
+        $this->deferredOutput .= "  {}\n";
+
+    }
+
+    public function printDestructorPrototype()
+    {
+        // $this->deferredOutput .= "  ~{$this->type_name}() {}\n";
+        $this->deferredOutput .= "  ~{$this->type_name}() override {}\n";
+    }
+
+    public function printNoncopyable()
+    {
+        $this->deferredOutput .= "  {$this->type_name}(const {$this->type_name}&) = delete;\n";
+        $this->deferredOutput .= "  {$this->type_name}& operator=(const {$this->type_name}&) = delete;\n";
+    }
+
+
+    public function startType($name): void
+    {
+        $this->type_name = $name;
+        echo "class $name;" . PHP_EOL;
+        $this->deferredOutput .= "class $name : public {$this->baseClass($name)} {\n";
+        $this->fields = [];
+    }
+
+    public function field(string $type, string $name, bool $nullable, bool $plural): void
+    {
+        if ($type == 'OperationKind') {
+        $type = 'string';
+      }
         $this->fields[] = [$type, $name, $nullable, $plural];
     }
 
-    public function endType($name, $isUnion)
+    public function endType(string $name): void
     {
+        $this->printFields();
+        $this->deferredOutput .= " public:\n";
         $this->printConstructor();
-        $this->printGetters();
+        $this->deferredOutput .= "\n";
         $this->printDestructorPrototype();
+        $this->deferredOutput .= "\n";
         $this->printNoncopyable();
-        $this->output .= "};\n\n";
+        $this->deferredOutput .= "\n";
+        $this->printGetters();
+        $this->deferredOutput .= "  void accept(visitor::AstVisitor *visitor) const override;\n";
+        $this->deferredOutput .= "};\n\n";
+
+        $this->type_name = null;
+        $this->fields = [];
+
     }
 
-    private function printConstructor()
+    private function  getterType($type, $nullable, $plural)
     {
-        $this->output .= "  $this->type_name(Location location";
-        foreach ($this->fields as list($type, $name, $nullable, $plural)) {
-            $this->output .= ", ";
-            if ($type === 'string') {
-                $this->output .= "std::string $name";
-            } elseif ($type === 'boolean') {
-                $this->output .= "bool $name";
-            } elseif ($plural) {
-                $this->output .= "std::vector<std::unique_ptr<$type>> $name";
-            } else {
-                $this->output .= "std::unique_ptr<$type> $name";
+       $t = $this->storageType($type);
+         if ($plural && $nullable) {
+            return "const std::vector<$t> *";
+        } elseif ($plural) {
+            return "const std::vector<$t> &";
+        } 
+        if(!$nullable) {
+            if($type == 'boolean') {
+                return "bool";
             }
+            if ($type == 'string') {
+                return "const char *";
+            }
+        } else {
+            return "const $type*";
         }
-        $this->output .= ") :" . $this->baseClass($this->type_name) . "(location)";
-        foreach ($this->fields as list($type, $name, $nullable, $plural)) {
-            $this->output .= ",\n    $name($name)";
-        }
-        $this->output .= " {}\n";
+        return "const $type&";
     }
 
-    private function printGetters()
+    private function getterValueToReturn($rawValue, $type, $nullable, $plural)
     {
-        foreach ($this->fields as list($type, $name, $nullable, $plural)) {
-            $this->output .= "  ";
-            if ($type === 'string') {
-                assert(!$nullable);
-                $this->output .= "const char *";
-            } elseif ($type === 'boolean') {
-                assert(!$nullable);
-                $this->output .= "bool";
-            } elseif ($nullable) {
-                $this->output .= "const $type *";
-            } else {
-                $this->output .= "const $type &";
-            }
-            $this->output .= " get".title($name)."() const {\n";
-            if ($plural && $nullable) {
-                $this->output .= "    return $name.get();\n";
-            } elseif ($plural) {
-                $this->output .= "    return *$name;\n";
-            } elseif ($type === 'boolean') {
-                $this->output .= "    return $name;\n";
-            } elseif ($nullable || $type === 'string') {
-                $this->output .= "    return $name.get();\n";
-            } else {
-                $this->output .= "    return *$name;\n";
-            }
-            $this->output .= "  }\n\n";
+        if ($plural && $nullable) {
+            return "$rawValue.get()";
+        } elseif ($plural) {
+            return "*$rawValue";
+        } elseif ($type == 'boolean') {
+            return "$rawValue";
+        } elseif ($nullable || $type == 'string') {
+            return "$rawValue.get()";
+        } else {
+            return "*$rawValue";
         }
     }
 
-    private function printDestructorPrototype()
+
+    public function printGetters()
     {
-        $this->output .= "  ~$this->type_name() {}\n";
+        foreach ($this->fields as $field) {
+            list($type, $name, $nullable, $plural) = $field;
+            $tName = title($name);
+            $this->deferredOutput .= "  {$this->getterType($type, $nullable, $plural)} get{$tName}() const {\n";
+            $name .= '_';
+            $this->deferredOutput .= "    return {$this->getterValueToReturn($name, $type, $nullable, $plural)};\n";
+            $this->deferredOutput .= "  }\n";
+        }
     }
 
-    private function printNoncopyable()
-    {
-        $this->output .= "  $this->type_name(const $this->type_name&) = delete;\n";
-        $this->output .= "  $this->type_name& operator=(const $this->type_name&) = delete;\n";
-    }
-
-    public function startUnion($name)
+    public function startUnion($name): void
     {
         $this->type_name = $name;
-        $this->deferredOutput .= "class $name;\n";
+        echo "class $name;\n";
         $this->deferredOutput .= "class $name : public Node {\n";
         $this->deferredOutput .= " public:\n";
         $this->printConstructor();
         $this->deferredOutput .= "};\n\n";
     }
 
-    public function unionOption($type)
+    public function unionOption($type): void
     {
         assert(!isset($this->bases[$type]), "$type cannot appear in more than one union!");
         $this->bases[$type] = $this->type_name;
     }
 
-    public function endUnion($name)
+    public function endUnion($name): void
     {
     }
 }

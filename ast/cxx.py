@@ -2,7 +2,6 @@
 import io as StringIO
 
 from casing import title
-from license import C_LICENSE_COMMENT
 
 class Printer(object):
   def __init__(self):
@@ -17,7 +16,7 @@ class Printer(object):
     self._fields = []
 
   def start_file(self):
-    print(C_LICENSE_COMMENT + '''/** @generated */
+    print('''/** @generated */
 #pragma once
 
 #include "AstNode.h"
