@@ -196,6 +196,7 @@ EOT;
     public function unionOption(string $type): void
     {
         echo '      \'' . $type . '\' => ' . $type . '::fromArray($data),' . PHP_EOL;
+        self::$currentOptions[] = $type;
 
     }
 

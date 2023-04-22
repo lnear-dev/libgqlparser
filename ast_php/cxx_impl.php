@@ -1,13 +1,11 @@
 <?php
-require __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/bootstrap.php';
 
 class Printer implements LanguagePrinter
 {
     public function startFile(): void
     {
-        echo <<<'EOT'
-/** @generated */
-
+        echo LICENSE. <<<'EOT'
 #include "Ast.h"
 #include "AstVisitor.h"
 
